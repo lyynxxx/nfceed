@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC Data Encryption/Decryption</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: bold;
+            color: #666;
+        }
+        .tab.active {
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            margin-bottom: -2px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        textarea, input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .info {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        .tag-details {
+            margin-top: 5px;
+            font-style: italic;
+        }
+        #qrcode {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .result-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .result-text {
+            flex: 1;
+            min-width: 300px;
+        }
+        .result-qr {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .copy-button {
+            margin-top: 10px;
+            background-color: #28a745;
+        }
+        .copy-button:hover {
+            background-color: #218838;
+        }
+        .error {
+            color: #dc3545;
+            margin-top: 10px;
+        }
+        .security-indicator {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .security-indicator-icon {
+            margin-right: 8px;
+        }
+
+        .password-strength {
+            margin-top: 4px;
+            height: 4px;
+            width: 100%;
+            background: #eee;
+            border-radius: 2px;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .strength-weak {
+            background-color: #dc3545;
+        }
+
+        .strength-medium {
+            background-color: #ffc107;
+        }
+
+        .strength-strong {
+            background-color: #28a745;
+        }
+
+        .status-secure {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .encryption-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('encrypt')">Encrypt</button>
+            <button class="tab" onclick="showTab('decrypt')">Decrypt</button>
+        </div>
+        
+        <!-- Encryption Tab -->
+        <div id="encrypt-tab" class="tab-content active">
+        <div class="form-group">
+            <label for="tagType">NFC Tag Type:</label>
+            <select id="tagType" onchange="updateTagInfo()">
+                <option value="NTAG213">NTAG213</option>
+                <option value="NTAG215" selected>NTAG215</option>
+                <option value="NTAG216">NTAG216</option>
+            </select>
+            <div class="tag-details" id="tagDetails"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="text">Text to Encrypt:</label>
+            <textarea id="text" rows="6" placeholder="Enter text to encrypt"></textarea>
+            <div class="info">
+                Characters: <span id="charCount">0</span><br>
+                Estimated encrypted size: <span id="byteCount">0</span> bytes<br>
+                Available space: <span id="availableSpace">504</span> bytes
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="password">Encryption Password:</label>
+            <input type="password" id="password" placeholder="Enter encryption password">
+            <div class="password-strength">
+                <div id="passwordStrengthBar" class="password-strength-bar"></div>
+            </div>
+            <div id="passwordFeedback" class="security-indicator"></div>
+        </div>
+
+        <button onclick="encryptData()">Encrypt</button>
+
+        <div id="result" class="result">
+            <h3>Encryption Result</h3>
+            <div class="result-container">
+                <div class="result-text">
+                    <label for="encryptedOutput">Encrypted Data:</label>
+                    <textarea id="encryptedOutput" rows="6" readonly></textarea>
+                    <div class="info">Final size: <span id="finalSize">0</span> bytes</div>
+                    <button onclick="copyToClipboard()" class="copy-button">Copy to Clipboard</button>
+                </div>
+                <div class="result-qr">
+                    <label>QR Code:</label>
+                    <div id="qrcode"></div>
+                    <div class="info">Scan to get encrypted data</div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Decryption Tab -->
+        <div id="decrypt-tab" class="tab-content">
+        <div class="form-group">
+            <label for="encryptedText">Encrypted Data:</label>
+            <textarea id="encryptedText" rows="6" placeholder="Paste encrypted data here"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="qrFile">Or scan QR code from image:</label>
+            <input type="file" id="qrFile" accept="image/*" class="mb-2">
+            <div id="qrReader" class="mt-2"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="decryptPassword">Decryption Password:</label>
+            <input type="password" id="decryptPassword" placeholder="Enter decryption password">
+        </div>
+
+        <button onclick="decryptData()">Decrypt</button>
+
+        <div id="decrypt-result" class="result">
+            <h3>Decryption Result</h3>
+            <div class="form-group">
+                <label for="decryptedOutput">Decrypted Text:</label>
+                <textarea id="decryptedOutput" rows="6" readonly></textarea>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <footer style="margin-top: 40px; padding: 20px; text-align: center; border-top: 1px solid #ddd; color: #666;">
+        <div>
+            NFCeed v0.3
+        </div>
+        <div style="margin-top: 10px;">
+            <a href="https://github.com/yourusername/nfc-encryption-tool" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               style="color: #007bff; text-decoration: none;">
+                View source code on GitHub
+            </a>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script>
+        const TAG_SIZES = {
+            'NTAG213': 144,
+            'NTAG215': 504,
+            'NTAG216': 888
+        };
+
+        const textArea = document.getElementById('text');
+        const charCountSpan = document.getElementById('charCount');
+        const byteCountSpan = document.getElementById('byteCount');
+        const availableSpaceSpan = document.getElementById('availableSpace');
+        let qrCode = null;
+
+        function updateTagInfo() {
+            const tagType = document.getElementById('tagType').value;
+            const tagSize = TAG_SIZES[tagType];
+            const tagDetails = document.getElementById('tagDetails');
+            availableSpaceSpan.textContent = tagSize;
+            
+            tagDetails.textContent = `${tagType}: ${tagSize} bytes of usable space`;
+            updateCounts();
+        }
+
+        textArea.addEventListener('input', updateCounts);
+
+        function updateCounts() {
+            const text = textArea.value;
+            const charCount = text.length;
+            // Estimate encrypted size: text bytes + salt(16) + nonce(12) + tag(16)
+            const estimatedBytes = new TextEncoder().encode(text).length + 44;
+            const tagType = document.getElementById('tagType').value;
+            const tagSize = TAG_SIZES[tagType];
+            
+            charCountSpan.textContent = charCount;
+            byteCountSpan.textContent = estimatedBytes;
+            
+            // Update color based on size
+            byteCountSpan.style.color = estimatedBytes > tagSize ? 'red' : 'black';
+        }
+
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Deactivate all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content and activate tab
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active');
+        }
+
+        function copyToClipboard() {
+            const encryptedOutput = document.getElementById('encryptedOutput');
+            encryptedOutput.select();
+            document.execCommand('copy');
+            alert('Encrypted data copied to clipboard!');
+        }
+
+        function generateQRCode(data) {
+            // Clear previous QR code if it exists
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            
+            // Create new QR code
+            qrCode = new QRCode(qrContainer, {
+                text: data,
+                width: 256,
+                height: 256,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        }
+
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            let feedback = [];
+
+            // Length check
+            if (password.length < 8) {
+                feedback.push("Password should be at least 8 characters long");
+            } else {
+                strength += 25;
+            }
+
+            // Complexity checks
+            if (password.match(/[A-Z]/)) strength += 25;
+            if (password.match(/[0-9]/)) strength += 25;
+            if (password.match(/[^A-Za-z0-9]/)) strength += 25;
+
+            // Update visual indicator
+            const strengthBar = document.getElementById('passwordStrengthBar');
+            strengthBar.style.width = strength + '%';
+            
+            // Update class based on strength
+            strengthBar.className = 'password-strength-bar ' + 
+                (strength <= 25 ? 'strength-weak' : 
+                 strength <= 50 ? 'strength-medium' : 
+                 'strength-strong');
+
+            // Update feedback
+            const feedbackDiv = document.getElementById('passwordFeedback');
+            feedbackDiv.innerHTML = `
+                <div class="security-indicator ${strength <= 25 ? 'status-error' : 
+                                               strength <= 50 ? 'status-warning' : 
+                                               'status-secure'}">
+                    <span class="security-indicator-icon">
+                        ${strength <= 25 ? '⚠️' : strength <= 50 ? '⚡' : '✓'}
+                    </span>
+                    <span>Password strength: ${strength <= 25 ? 'Weak' : 
+                                             strength <= 50 ? 'Medium' : 
+                                             'Strong'}</span>
+                </div>
+            `;
+        }
+
+        function updateSecurityStatus(isSecure, message) {
+            const statusDiv = document.getElementById('securityStatus');
+            statusDiv.innerHTML = `
+                <div class="security-indicator ${isSecure ? 'status-secure' : 'status-warning'}">
+                    <span class="security-indicator-icon">${isSecure ? '🔒' : '⚠️'}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+        }
+
+        // Add event listeners
+        document.getElementById('password').addEventListener('input', (e) => {
+            checkPasswordStrength(e.target.value);
+        });
+
+        document.getElementById('decryptPassword').addEventListener('input', (e) => {
+            checkPasswordStrength(e.target.value);
+        });
+
+        async function encryptData() {
+            const text = document.getElementById('text').value;
+            const password = document.getElementById('password').value;
+            const tagType = document.getElementById('tagType').value;
+
+            if (!text || !password) {
+                updateSecurityStatus(false, 'Please enter both text and password');
+                return;
+            }
+
+            if (password.length < 8) {
+                updateSecurityStatus(false, 'Password is too weak for secure encryption');
+                return;
+            }
+
+            try {
+                const response = await fetch('/encrypt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text, password, tagType })
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Encryption error: ' + data.error);
+                    return;
+                }
+
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('encryptedOutput').value = data.encrypted;
+                document.getElementById('finalSize').textContent = data.length;
+                
+                // Generate QR code with encrypted data
+                generateQRCode(data.encrypted);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+            updateSecurityStatus(true, 'Data encrypted securely');
+        }
+
+        async function decryptData() {
+            const encryptedText = document.getElementById('encryptedText').value;
+            const password = document.getElementById('decryptPassword').value;
+
+            if (!encryptedText || !password) {
+                alert('Please enter both encrypted text and password');
+                return;
+            }
+
+            try {
+                const response = await fetch('/decrypt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        encryptedText: encryptedText,
+                        password: password 
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Decryption error: ' + data.error);
+                    return;
+                }
+
+                document.getElementById('decrypt-result').style.display = 'block';
+                document.getElementById('decryptedOutput').value = data.decrypted;
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        const qrFile = document.getElementById('qrFile');
+        if (qrFile) {
+            qrFile.addEventListener('change', handleQRFile);
+        }
+
+        function handleQRFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const html5QrcodeScanner = new Html5Qrcode("qrReader");
+            
+            html5QrcodeScanner.scanFile(file, true)
+                .then(decodedText => {
+                    // Put the decoded text into the encrypted text input
+                    const encryptedTextArea = document.getElementById('encryptedText');
+                    if (encryptedTextArea) {
+                        encryptedTextArea.value = decodedText;
+                    }
+                })
+                .catch(err => {
+                    alert('Error scanning QR code: ' + err);
+                })
+                .finally(() => {
+                    // Clear the file input for next use
+                    qrFile.value = '';
+                });
+        }
+
+
+
+        // Initialize tag info on page load
+        updateTagInfo();
+    </script>
+</body>
+</html>

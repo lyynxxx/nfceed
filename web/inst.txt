@@ -1,0 +1,27 @@
+## Create service user
+useradd --system --no-create-home --shell /usr/sbin/nologin nfceed
+
+## Create venv
+cd /opt/htdocs/nfceed
+python3 -m venv venv
+source venv/bin/activate
+
+## Install stuff
+pip install flask cryptography gunicorn
+chown -R nfceed:angelhost /opt/htdocs/nfceed/venv
+chown -R nfceed:angelhost /opt/htdocs/nfceed/app
+
+## Systemd ervice
+[Unit]
+Description=Gunicorn instance to serve NFCeed web application
+After=network.target
+
+[Service]
+User=nfceed
+Group=angelhost
+WorkingDirectory=/opt/htdocs/nfceed/app
+Environment="PATH=/opt/htdocs/nfceed/venv/bin"
+ExecStart=/opt/htdocs/nfceed/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5050 app:app
+
+[Install]
+WantedBy=multi-user.target
