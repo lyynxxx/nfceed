@@ -1,0 +1,7 @@
+
+pip install cryptography
+
+chmod +x decrypt.py
+
+./decrypt.py "your_encrypted_base64_data" "your_password"
+

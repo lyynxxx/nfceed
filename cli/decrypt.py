@@ -1,54 +1,55 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
-# Usage function
-usage() {
-    echo "Usage: $0 <base64_encrypted_data> <password>"
-    exit 1
-}
+import sys
+import base64
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.backends import default_backend
 
-# Check arguments
-if [ "$#" -ne 2 ]; then
-    usage
-fi
+def derive_key(password: str, salt: bytes) -> bytes:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    return kdf.derive(password.encode())
 
-encrypted_data="$1"
-password="$2"
+def decrypt_data(encrypted_data: str, password: str) -> str:
+    # Decode the base64 data
+    combined = base64.b64decode(encrypted_data)
+    
+    # Extract the components
+    salt = combined[:16]
+    nonce = combined[16:28]
+    ciphertext = combined[28:]
+    
+    # Derive the key
+    key = derive_key(password, salt)
+    
+    # Decrypt
+    aesgcm = AESGCM(key)
+    plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+    
+    return plaintext.decode('utf-8')
 
-# Create a temporary directory with secure permissions
-tempdir=$(mktemp -d)
-chmod 700 "$tempdir"
-cd "$tempdir"
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: ./decrypt.py <encrypted_data> <password>")
+        sys.exit(1)
+    
+    encrypted_data = sys.argv[1]
+    password = sys.argv[2]
+    
+    try:
+        decrypted = decrypt_data(encrypted_data, password)
+        print(decrypted)
+    except Exception as e:
+        print(f"Error decrypting data: {str(e)}", file=sys.stderr)
+        sys.exit(1)
 
-# Decode base64 data
-echo "$encrypted_data" | base64 -d > combined.bin
-
-# Extract components (salt: 16 bytes, nonce: 12 bytes, rest is ciphertext)
-dd if=combined.bin of=salt.bin bs=16 count=1 2>/dev/null
-dd if=combined.bin of=nonce.bin bs=16 skip=1 count=1 2>/dev/null
-dd if=combined.bin of=ciphertext.bin bs=28 skip=1 2>/dev/null
-
-# Derive key using PBKDF2 (100000 iterations)
-openssl pkeyutl -derive \
-    -kdf pbkdf2 \
-    -kdflen 32 \
-    -pkeyopt digest:sha256 \
-    -pkeyopt iterations:100000 \
-    -pkeyopt pass:"$password" \
-    -pkeyopt salt:"$(xxd -p -c 32 salt.bin)" \
-    -out key.bin
-
-# Decrypt using AES-256-GCM
-openssl enc -aes-256-gcm \
-    -d \
-    -in ciphertext.bin \
-    -K "$(xxd -p -c 64 key.bin)" \
-    -iv "$(xxd -p -c 24 nonce.bin)" \
-    -out decrypted.txt
-
-# Output decrypted data
-cat decrypted.txt
-
-# Clean up
-cd - >/dev/null
-rm -rf "$tempdir"
+if __name__ == '__main__':
+    main()
 
