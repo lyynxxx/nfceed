@@ -1,15 +1,15 @@
-## Create service user
+## Create service user, if you plan to host this
 useradd --system --no-create-home --shell /usr/sbin/nologin nfceed
 
-## Create venv
+## Create a python3 venv somewhere
 cd /opt/htdocs/nfceed
 python3 -m venv venv
 source venv/bin/activate
 
-## Install stuff
+## Install dependencies and set file permissions
 pip install flask cryptography gunicorn
-chown -R nfceed:angelhost /opt/htdocs/nfceed/venv
-chown -R nfceed:angelhost /opt/htdocs/nfceed/app
+chown -R nfceed:nfceed /opt/htdocs/nfceed/venv
+chown -R nfceed:nfceed /opt/htdocs/nfceed/app
 
 ## Systemd ervice
 [Unit]
@@ -18,10 +18,12 @@ After=network.target
 
 [Service]
 User=nfceed
-Group=angelhost
 WorkingDirectory=/opt/htdocs/nfceed/app
 Environment="PATH=/opt/htdocs/nfceed/venv/bin"
 ExecStart=/opt/htdocs/nfceed/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5050 app:app
 
 [Install]
 WantedBy=multi-user.target
+
+---------------------------------------------------------------
+To just run on local, download the "web" folder, create the python3 venv, activate and tun "python3 app.py", then open your browser: http://127.0.0.1:5000
