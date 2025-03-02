@@ -10,8 +10,9 @@ Usage:
 
 or read data from a txt file
 
-./encrypt.py -f secret.txt "your_password"
- python3 encrypt.py -f demo_file.txt "valami"
+./encrypt.py -f secret.txt "your_password" 
+
+test it on the demo file: python3 encrypt.py -f demo_file.txt "valami"
 
 
 ./decrypt.py "your_encrypted_base64_data" "your_password"
