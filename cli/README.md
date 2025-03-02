@@ -7,10 +7,14 @@ Make the files executable with "chmod +x encrypt.py" or use them with the interp
 Usage:
 
 ./encrypt.py "secret message" "your_password"
+
 or read data from a txt file
+
 ./encrypt.py -f secret.txt "your_password"
 
 ./decrypt.py "your_encrypted_base64_data" "your_password"
+
 or from echo/cat
+
 echo "TGl2ZSBsb25nIGFuZCBwcm9zcGVyICE=" | ./decrypt.py - "mypassword123"
 
