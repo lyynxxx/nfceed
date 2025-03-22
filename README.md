@@ -15,3 +15,5 @@ Features (web):
 CLI:
  - Why would anyone trust a scammy websie/app? Providing cli scripts and apps to do this yourself on your own machine, even without internet...
 
+
+Demo: https://nfceed.angelhost.eu/
